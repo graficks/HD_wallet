@@ -1,8 +1,10 @@
 import hashlib
 import binascii
+import base58
+import hmac
 #Perform SHA on binary
 
-binary_seed = "11011010101 00001011000 11000110011 00101110011 01011100100 10011010111 00111011101 01100001000 11001000110 10110001111 11000111000 0010001"
+binary_seed = "01011100010 11101100111 00010100110 10000001010 01110101111 10100001101 11100100000 00110000110 10110000001 10010000101 01001100001 0000100"
 
 binary_seed = binary_seed.replace(" ","")
 binary_seed = int(binary_seed, 2)
@@ -40,11 +42,31 @@ for x in range(int(len(seed)/11)):
 mnemonic = mnemonic.replace('\n','')
 #remove the last space
 mnemonic = mnemonic[:-1]
+print("mnemonic: ")
 print(repr(mnemonic))
 mnemonic = bytes(mnemonic, 'utf8')
 salt = "mnemonic".encode('utf8')
 bip39_seed = hashlib.pbkdf2_hmac('sha512', mnemonic, salt, 2048)
+#bip39_seed = bip39_seed.hex()
 print("bip39_seed: ")
 print(bip39_seed.hex())
 #bytes(mnemonic, 'utf-8')
 #mnemonic.encode('utf-8')
+
+
+
+print("bip32_ext_key: ") #or bip32 root key
+bip32_hash = hmac.new(b"Bitcoin seed", bip39_seed, digestmod=hashlib.sha512).digest()
+#(serialization format bip32) version, depth, parent's fingerprint, child number, chain code, 00 for private keys
+bip32_ext_key = b"\x04\x88\xad\xe4"  # xprv
+bip32_ext_key += b"\x00" * 9  # Depth, parent fingerprint, and child number
+bip32_ext_key += bip32_hash[32:]  # Chain code
+bip32_ext_key += b"\x00" + bip32_hash[:32]  # Master key
+
+# Double hash using SHA256
+checksum = hashlib.sha256(bip32_ext_key).digest()
+checksum = hashlib.sha256(checksum).digest()
+bip32_ext_key += checksum[:4]
+
+#print(bip32_ext_key.hex())
+print(str(base58.b58encode(bip32_ext_key))[2:-1])
