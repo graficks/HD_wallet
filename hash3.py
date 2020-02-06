@@ -81,6 +81,7 @@ def pub_key_gen(x_pub_key, y_pub_key):
 
     #print( "step 2: hash of 1 byte plus x coordinate  "
     sha1 = hashlib.sha256()
+    #length issue sometimes happens here.
     sha1.update(bytes.fromhex(compressed_pubkey))
     hash1 = sha1.digest()
 
@@ -91,7 +92,7 @@ def pub_key_gen(x_pub_key, y_pub_key):
 
     #print( "step 4: Add byte in front of RIPEMD-160 hash (0x00 for Main Network)  "
     #00 for bitcoin. 0x30 for lite. 0x47 for vert
-    ripemd_ext = "47" + ripemd.hexdigest()
+    ripemd_ext = "00" + ripemd.hexdigest()
 
     #print( "step 5: sha256 previous hash  "
     ripemd_ext = bytes.fromhex(ripemd_ext)
@@ -137,18 +138,15 @@ def mnemonic_from_seed(seed):
     seed = bin(seed)
     seed = seed[2:]
     while(len(seed) != 132 and len(seed) != 264): seed = "0" + seed
-    word_list = open("wordlist.txt")
-    lines = word_list.readlines()
-    mnemonic = ""
-    for x in range(int(len(seed)/11)):
-        word_index = int(seed[x*11 : x*11 + 11], 2)
-        mnemonic += lines[word_index] + " "
+
+    mnemonic = "sad valve spoon once once barely fragile tribe hair critic wisdom toddler"
+
     return mnemonic
 
 def bip39_seed_from_mnemonic(mnemonic):
     mnemonic = mnemonic.replace('\n','')
     #remove the last space
-    mnemonic = mnemonic[:-1]
+    #mnemonic = mnemonic[:-1]
     print("mnemonic: ")
     print(repr(mnemonic))
     mnemonic = bytes(mnemonic, 'utf8')
@@ -226,7 +224,10 @@ def bip44_path_level(depth, index, parent_key):
         sha512 = hmac.new(parent_chain_code, b'\x00' + parent_priv_key + index, digestmod=hashlib.sha512).digest()
 
         priv_key = sha512[:32]
-        priv_key = bytes.fromhex(hex( ( int(priv_key.hex(), 16) + int(parent_priv_key.hex(), 16) ) % N )[2:])
+        length = len(hex( ( int(priv_key.hex(), 16) + int(parent_priv_key.hex(), 16) ) % N )[2:])
+        if(length % 2 == 1): length = "0"
+        else: length = ""
+        priv_key = bytes.fromhex(length + hex( ( int(priv_key.hex(), 16) + int(parent_priv_key.hex(), 16) ) % N )[2:])
         chain_code = sha512[32:]
 
         x_pub_key, y_pub_key = ECmultiply2(Gx,Gy,int(parent_priv_key.hex(), 16))
@@ -244,7 +245,10 @@ def bip44_path_level(depth, index, parent_key):
         sha512 = hmac.new(parent_chain_code, bytes.fromhex(compressed_pubkey) + index, digestmod=hashlib.sha512).digest()
 
         priv_key = sha512[:32]
-        priv_key = bytes.fromhex(hex( ( int(priv_key.hex(), 16) + int(parent_priv_key.hex(), 16) ) % N )[2:])
+        length = len(hex( ( int(priv_key.hex(), 16) + int(parent_priv_key.hex(), 16) ) % N )[2:])
+        if(length % 2 == 1): length = "0"
+        else: length = ""
+        priv_key = bytes.fromhex(length + hex( ( int(priv_key.hex(), 16) + int(parent_priv_key.hex(), 16) ) % N )[2:])
         chain_code = sha512[32:]
 
     ext_key  = b"\x04\x88\xad\xe4"  # xprv
@@ -259,6 +263,9 @@ def bip44_path_level(depth, index, parent_key):
     checksum = hashlib.sha256(checksum).digest()
     ext_key += checksum[:4]
 
+    pub_x, pub_y = ECmultiply2(Gx,Gy,int(priv_key.hex(), 16))
+    print(pub_key_gen(pub_x, pub_y))
+
     ext_key = str(base58.b58encode(ext_key))[2:-1]
     print("ext_key: ")
     print(ext_key)
@@ -272,7 +279,7 @@ if __name__ == '__main__':
     bip39_seed = bip39_seed_from_mnemonic(mnemonic)
     bip32_ext_key = bip32_ext_key_from_bip39_seed(bip39_seed)
     bip44_ext_key = bip44_ext_key_from_bip32_ext_key(bip32_ext_key)
-    vert = bip44_path_level(b'\x02', b'\x80\x00\x00\x1c', bip44_ext_key)
-    vert_account = bip44_path_level(b'\x03', b'\x80\x00\x00\x00', vert)
-    vert_change = bip44_path_level(b'\x04', b'\x00\x00\x00\x00', vert_account)
-    vert_address = bip44_path_level(b'\x05', b'\x00\x00\x00\x00', vert_change)
+    coin = bip44_path_level(b'\x02', b'\x80\x00\x07\x17', bip44_ext_key)
+    coin_account = bip44_path_level(b'\x03', b'\x80\x00\x00\x00', coin)
+    coin_change = bip44_path_level(b'\x04', b'\x00\x00\x00\x00', coin_account)
+    coin_address = bip44_path_level(b'\x05', b'\x00\x00\x00\x04', coin_change)
